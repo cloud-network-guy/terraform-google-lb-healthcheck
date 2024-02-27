@@ -1,29 +1,30 @@
 locals {
-  create                 = coalesce(var.create, true)
-  project_id             = lower(trimspace(var.project_id))
-  name_prefix            = var.name_prefix != null ? lower(trimspace(var.name_prefix)) : null
-  name                   = var.name != null ? lower(trimspace(var.name)) : null
-  description            = coalesce(var.description, "Managed by Terraform")
-  is_regional            = var.region != null ? true : false
-  region                 = local.is_regional ? var.region : "global"
-      legacy       = coalesce(var.legacy, false)
+  create      = coalesce(var.create, true)
+  project_id  = lower(trimspace(var.project_id))
+  name_prefix = var.name_prefix != null ? lower(trimspace(var.name_prefix)) : null
+  name        = var.name != null ? lower(trimspace(var.name)) : null
+  description = coalesce(var.description, "Managed by Terraform")
+  is_regional = var.region != null ? true : false
+  region      = local.is_regional ? var.region : "global"
+  legacy      = coalesce(var.legacy, false)
+  protocol    = upper(coalesce(var.protocol, var.request_path != null || var.response != null ? "http" : "tcp"))
   _healthchecks = [
     {
-      create       = local.create
-      project_id   = local.project_id
-      is_regional = local.is_regional
-      is_legacy    = local.legacy
-      region       = local.region
-      name         = local.name
-      description = local.description
-      protocol     = upper(coalesce(var.protocol, var.request_path != null || var.response != null ? "http" : "tcp"))
-  port = coalesce(var.port, 80)
-      proxy_header = coalesce(var.proxy_header, "NONE")
-  logging = coalesce(var.logging, false)
-  healthy_threshold   = 2
-  unhealthy_threshold = 2
-  interval = 10
-  timeout_sec = 5
+      create              = local.create
+      project_id          = local.project_id
+      is_regional         = local.is_regional
+      is_legacy           = local.legacy
+      region              = local.region
+      name                = local.name
+      description         = local.description
+      protocol            = local.protocol
+      port                = coalesce(var.port, 80)
+      proxy_header        = coalesce(var.proxy_header, "NONE")
+      logging             = coalesce(var.logging, false)
+      healthy_threshold   = coalesce(var.healthy_threshold, 2)
+      unhealthy_threshold = coalesce(var.unhealthy_threshold, 2)
+      check_interval_sec  = coalesce(var.interval, 10)
+      timeout_sec         = coalesce(var.timeout, 5)
     }
   ]
 }
@@ -102,14 +103,14 @@ resource "google_compute_region_health_check" "default" {
       response     = each.value.response
     }
   }
-  check_interval_sec  = each.value.interval
+  check_interval_sec  = each.value.check_interval_sec
   timeout_sec         = each.value.timeout_sec
   healthy_threshold   = each.value.healthy_threshold
   unhealthy_threshold = each.value.unhealthy_threshold
   log_config {
     enable = each.value.logging
   }
-  #depends_on = [null_resource.healthchecks]
+  depends_on = [null_resource.healthchecks]
 }
 
 # Global Health Checks
@@ -152,14 +153,14 @@ resource "google_compute_health_check" "default" {
       response     = each.value.response
     }
   }
-  check_interval_sec  = each.value.interval
+  check_interval_sec  = each.value.check_interval_sec
   timeout_sec         = each.value.timeout_sec
   healthy_threshold   = each.value.healthy_threshold
   unhealthy_threshold = each.value.unhealthy_threshold
   log_config {
     enable = each.value.logging
   }
-  #depends_on = [null_resource.healthchecks]
+  depends_on = [null_resource.healthchecks]
 }
 
 
@@ -170,9 +171,8 @@ resource "google_compute_http_health_check" "default" {
   name               = each.value.name
   description        = each.value.description
   port               = each.value.port
-  check_interval_sec = each.value.interval
+  check_interval_sec = each.value.check_interval_sec
   timeout_sec        = each.value.timeout_sec
-  #depends_on = [null_resource.healthchecks]
 }
 
 # Legacy HTTPS Health Check
@@ -182,7 +182,6 @@ resource "google_compute_https_health_check" "default" {
   name               = each.value.name
   description        = each.value.description
   port               = each.value.port
-  check_interval_sec = each.value.interval
+  check_interval_sec = each.value.check_interval_sec
   timeout_sec        = each.value.timeout
-  #depends_on = [null_resource.healthchecks]
 }

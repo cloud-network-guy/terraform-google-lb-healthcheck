@@ -52,14 +52,30 @@ variable "proxy_header" {
   default = null
 }
 variable "response" {
-  type = string
+  type    = string
   default = null
 }
 variable "legacy" {
-  type = bool
+  type    = bool
   default = null
 }
 variable "logging" {
-  type = bool
+  type    = bool
+  default = null
+}
+variable "interval" {
+  type    = number
+  default = null
+}
+variable "timeout" {
+  type    = number
+  default = null
+}
+variable "healthy_threshold" {
+  type    = number
+  default = null
+}
+variable "unhealthy_threshold" {
+  type    = number
   default = null
 }
