@@ -45,7 +45,7 @@ locals {
     merge(v, {
       name         = coalesce(var.name, var.name == null ? random_string.names[i].result : "error")
       request_path = startswith(v.protocol, "HTTP") ? coalesce(var.request_path, "/") : null
-      response     = startswith(v.protocol, "HTTP") ? coalesce(var.response, "OK") : null
+      response     = startswith(v.protocol, "HTTP") ? var.response : null
       is_tcp       = v.protocol == "TCP" ? true : false
       is_http      = v.protocol == "HTTP" ? true : false
       is_https     = v.protocol == "HTTPS" ? true : false
