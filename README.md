@@ -1,1 +1,2 @@
-# terraform-google-lb-healthcheck
+# terraform-google-healthchecks
+Healthchecks in GCP

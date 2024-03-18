@@ -90,7 +90,7 @@ resource "google_compute_region_health_check" "default" {
   dynamic "https_health_check" {
     for_each = each.value.is_https ? [true] : []
     content {
-      port         = each.value
+      port         = each.value.port
       host         = each.value.host
       request_path = each.value.request_path
       proxy_header = each.value.proxy_header
@@ -140,7 +140,7 @@ resource "google_compute_health_check" "default" {
   dynamic "https_health_check" {
     for_each = each.value.is_https ? [true] : []
     content {
-      port         = each.value
+      port         = each.value.port
       host         = each.value.host
       request_path = each.value.request_path
       proxy_header = each.value.proxy_header
