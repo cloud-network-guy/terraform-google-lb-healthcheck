@@ -35,6 +35,10 @@ variable "protocol" {
   type    = string
   default = null
 }
+variable "host" {
+  type    = string
+  default = null
+}
 variable "port" {
   type    = number
   default = null

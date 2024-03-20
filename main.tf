@@ -19,7 +19,7 @@ locals {
       description         = local.description
       protocol            = local.protocol
       port                = coalesce(var.port, 80)
-      host = null
+      host                = coalesce(var.host, "")
       proxy_header        = coalesce(var.proxy_header, "NONE")
       logging             = coalesce(var.logging, false)
       healthy_threshold   = coalesce(var.healthy_threshold, 2)
