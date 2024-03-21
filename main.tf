@@ -51,7 +51,7 @@ locals {
       is_https     = v.protocol == "HTTPS" ? true : false
       is_ssl       = v.protocol == "SSL" ? true : false
     })
-  ]
+  ] 
   healthchecks = [for i, v in local.__healthchecks :
     merge(v, {
       index_key = v.is_regional ? "${v.project_id}/${v.region}/${v.name}" : "${v.project_id}/${v.name}"
