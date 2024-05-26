@@ -17,6 +17,7 @@ locals {
   region           = local.is_regional ? var.region : "global"
   protocol         = upper(coalesce(var.protocol, var.request_path != null || var.response != null ? "http" : "tcp"))
   is_regional      = var.region != null && var.region != "global" ? true : false
+  is_global        = !local.is_regional
   is_legacy        = coalesce(var.legacy, false)
   is_tcp           = local.protocol == "TCP" ? true : false
   is_http          = local.protocol == "HTTP" ? true : false
