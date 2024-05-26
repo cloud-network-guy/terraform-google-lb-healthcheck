@@ -1,23 +1,37 @@
+resource "random_string" "random_name" {
+  count   = var.name == null ? 1 : 0
+  length  = 5
+  lower   = true
+  upper   = false
+  special = false
+  numeric = false
+}
+
 locals {
   create      = coalesce(var.create, true)
   project_id  = lower(trimspace(var.project_id))
   name_prefix = var.name_prefix != null ? lower(trimspace(var.name_prefix)) : null
-  name        = var.name != null ? lower(trimspace(var.name)) : null
-  description = coalesce(var.description, "Managed by Terraform")
-  is_regional = var.region != null ? true : false
+  name        = var.name != null ? lower(trimspace(var.name)) : one(random_string.random_name).result
+  base_name   = var.name_prefix != null ? "${lower(trimspace(var.name_prefix))}-${local.name}" : local.name
+  description = trimspace(coalesce(var.description, "Managed by Terraform"))
+  is_regional = var.region != null && var.region != "global" ? true : false
   region      = local.is_regional ? var.region : "global"
-  legacy      = coalesce(var.legacy, false)
+  is_legacy   = coalesce(var.legacy, false)
   protocol    = upper(coalesce(var.protocol, var.request_path != null || var.response != null ? "http" : "tcp"))
+  is_http     = local.protocol == "HTTP" ? true : false
+  is_https    = local.protocol == "HTTPS" ? true : false
   _healthchecks = [
     {
       create              = local.create
       project_id          = local.project_id
-      is_regional         = local.is_regional
-      is_legacy           = local.legacy
-      region              = local.region
-      name                = local.name
-      description         = local.description
       protocol            = local.protocol
+      is_regional         = local.is_regional
+      is_legacy           = local.is_legacy
+      is_http             = local.is_http
+      is_https            = local.is_https
+      region              = local.region
+      name                = local.base_name
+      description         = local.description
       port                = coalesce(var.port, 80)
       host                = var.host != null ? trimspace(var.host) : null
       proxy_header        = coalesce(var.proxy_header, "NONE")
@@ -43,15 +57,15 @@ resource "random_string" "names" {
 locals {
   __healthchecks = [for i, v in local._healthchecks :
     merge(v, {
-      name         = coalesce(var.name, var.name == null ? random_string.names[i].result : "error")
+      #name         = coalesce(var.name, var.name == null ? random_string.names[i].result : "error")
       request_path = startswith(v.protocol, "HTTP") ? coalesce(var.request_path, "/") : null
       response     = startswith(v.protocol, "HTTP") ? var.response : null
       is_tcp       = v.protocol == "TCP" ? true : false
-      is_http      = v.protocol == "HTTP" ? true : false
-      is_https     = v.protocol == "HTTPS" ? true : false
-      is_ssl       = v.protocol == "SSL" ? true : false
+      #is_http      = v.protocol == "HTTP" ? true : false
+      #is_https     = v.protocol == "HTTPS" ? true : false
+      is_ssl = v.protocol == "SSL" ? true : false
     })
-  ] 
+  ]
   healthchecks = [for i, v in local.__healthchecks :
     merge(v, {
       index_key = v.is_regional ? "${v.project_id}/${v.region}/${v.name}" : "${v.project_id}/${v.name}"
