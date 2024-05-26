@@ -1,6 +1,8 @@
-resource "random_string" "random_name" {
+
+# If no name provided, generate a random one
+resource "random_string" "name" {
   count   = var.name == null ? 1 : 0
-  length  = 5
+  length  = 8
   lower   = true
   upper   = false
   special = false
@@ -8,69 +10,39 @@ resource "random_string" "random_name" {
 }
 
 locals {
-  create      = coalesce(var.create, true)
-  project_id  = lower(trimspace(var.project_id))
-  name_prefix = var.name_prefix != null ? lower(trimspace(var.name_prefix)) : null
-  name        = var.name != null ? lower(trimspace(var.name)) : one(random_string.random_name).result
-  base_name   = var.name_prefix != null ? "${lower(trimspace(var.name_prefix))}-${local.name}" : local.name
-  description = trimspace(coalesce(var.description, "Managed by Terraform"))
-  is_regional = var.region != null && var.region != "global" ? true : false
-  region      = local.is_regional ? var.region : "global"
-  is_legacy   = coalesce(var.legacy, false)
-  protocol    = upper(coalesce(var.protocol, var.request_path != null || var.response != null ? "http" : "tcp"))
-  is_http     = local.protocol == "HTTP" ? true : false
-  is_https    = local.protocol == "HTTPS" ? true : false
-  _healthchecks = [
+  create           = coalesce(var.create, true)
+  project_id       = lower(trimspace(var.project_id))
+  name             = var.name != null ? lower(trimspace(var.name)) : one(random_string.name).result
+  description      = trimspace(coalesce(var.description, "Managed by Terraform"))
+  region           = local.is_regional ? var.region : "global"
+  protocol         = upper(coalesce(var.protocol, var.request_path != null || var.response != null ? "http" : "tcp"))
+  is_regional      = var.region != null && var.region != "global" ? true : false
+  is_legacy        = coalesce(var.legacy, false)
+  is_tcp           = local.protocol == "TCP" ? true : false
+  is_http          = local.protocol == "HTTP" ? true : false
+  is_https         = local.protocol == "HTTPS" ? true : false
+  is_http_or_https = local.is_http || local.is_https ? true : false
+  is_ssl           = local.protocol == "SSL" ? true : false
+  healthchecks = local.create ? [
     {
-      create              = local.create
       project_id          = local.project_id
-      protocol            = local.protocol
-      is_regional         = local.is_regional
-      is_legacy           = local.is_legacy
-      is_http             = local.is_http
-      is_https            = local.is_https
       region              = local.region
-      name                = local.base_name
+      name                = local.name
       description         = local.description
+      protocol            = local.protocol
+      request_path        = local.is_http || local.is_https ? coalesce(var.request_path, "/") : null
+      response            = local.is_http || local.is_https ? var.response : null
       port                = coalesce(var.port, 80)
-      host                = var.host != null ? trimspace(var.host) : null
+      host                = local.is_http_or_https && var.host != null ? trimspace(var.host) : null
       proxy_header        = coalesce(var.proxy_header, "NONE")
       logging             = coalesce(var.logging, false)
       healthy_threshold   = coalesce(var.healthy_threshold, 2)
       unhealthy_threshold = coalesce(var.unhealthy_threshold, 2)
       check_interval_sec  = coalesce(var.interval, 10)
       timeout_sec         = coalesce(var.timeout, 5)
+      index_key           = "${local.project_id}/${(local.is_regional ? "${local.region}/" : "")}${local.name}"
     }
-  ]
-}
-
-# If no name yet, generate a random one
-resource "random_string" "names" {
-  for_each = { for i, v in local._healthchecks : i => true if v.name == null }
-  length   = 8
-  lower    = true
-  upper    = false
-  special  = false
-  numeric  = false
-}
-
-locals {
-  __healthchecks = [for i, v in local._healthchecks :
-    merge(v, {
-      #name         = coalesce(var.name, var.name == null ? random_string.names[i].result : "error")
-      request_path = startswith(v.protocol, "HTTP") ? coalesce(var.request_path, "/") : null
-      response     = startswith(v.protocol, "HTTP") ? var.response : null
-      is_tcp       = v.protocol == "TCP" ? true : false
-      #is_http      = v.protocol == "HTTP" ? true : false
-      #is_https     = v.protocol == "HTTPS" ? true : false
-      is_ssl = v.protocol == "SSL" ? true : false
-    })
-  ]
-  healthchecks = [for i, v in local.__healthchecks :
-    merge(v, {
-      index_key = v.is_regional ? "${v.project_id}/${v.region}/${v.name}" : "${v.project_id}/${v.name}"
-    }) if v.create == true
-  ]
+  ] : []
 }
 
 resource "null_resource" "healthchecks" {
@@ -79,20 +51,20 @@ resource "null_resource" "healthchecks" {
 
 # Regional Health Checks
 resource "google_compute_region_health_check" "default" {
-  for_each    = { for i, v in local.healthchecks : v.index_key => v if v.is_regional && !v.is_legacy }
+  for_each    = { for i, v in local.healthchecks : v.index_key => v if local.is_regional && !local.is_legacy }
   project     = each.value.project_id
   name        = each.value.name
   description = each.value.description
   region      = each.value.region
   dynamic "tcp_health_check" {
-    for_each = each.value.is_tcp ? [true] : []
+    for_each = local.is_tcp ? [true] : []
     content {
       port         = each.value.port
       proxy_header = each.value.proxy_header
     }
   }
   dynamic "http_health_check" {
-    for_each = each.value.is_http ? [true] : []
+    for_each = local.is_http ? [true] : []
     content {
       port         = each.value.port
       host         = each.value.host
@@ -102,7 +74,7 @@ resource "google_compute_region_health_check" "default" {
     }
   }
   dynamic "https_health_check" {
-    for_each = each.value.is_https ? [true] : []
+    for_each = local.is_https ? [true] : []
     content {
       port         = each.value.port
       host         = each.value.host
@@ -112,7 +84,7 @@ resource "google_compute_region_health_check" "default" {
     }
   }
   dynamic "ssl_health_check" {
-    for_each = each.value.is_ssl ? [true] : []
+    for_each = local.is_ssl ? [true] : []
     content {
       proxy_header = each.value.proxy_header
       response     = each.value.response
@@ -130,19 +102,19 @@ resource "google_compute_region_health_check" "default" {
 
 # Global Health Checks
 resource "google_compute_health_check" "default" {
-  for_each    = { for i, v in local.healthchecks : v.index_key => v if !v.is_regional && !v.is_legacy }
+  for_each    = { for i, v in local.healthchecks : v.index_key => v if !local.is_regional && !local.is_legacy }
   project     = each.value.project_id
   name        = each.value.name
   description = each.value.description
   dynamic "tcp_health_check" {
-    for_each = each.value.is_tcp ? [true] : []
+    for_each = local.is_tcp ? [true] : []
     content {
       port         = each.value.port
       proxy_header = each.value.proxy_header
     }
   }
   dynamic "http_health_check" {
-    for_each = each.value.is_http ? [true] : []
+    for_each = local.is_http ? [true] : []
     content {
       port         = each.value.port
       host         = each.value.host
@@ -152,7 +124,7 @@ resource "google_compute_health_check" "default" {
     }
   }
   dynamic "https_health_check" {
-    for_each = each.value.is_https ? [true] : []
+    for_each = local.is_https ? [true] : []
     content {
       port         = each.value.port
       host         = each.value.host
@@ -162,7 +134,7 @@ resource "google_compute_health_check" "default" {
     }
   }
   dynamic "ssl_health_check" {
-    for_each = each.value.is_ssl ? [true] : []
+    for_each = local.is_ssl ? [true] : []
     content {
       proxy_header = each.value.proxy_header
       response     = each.value.response
@@ -181,7 +153,7 @@ resource "google_compute_health_check" "default" {
 
 # Legacy HTTP Health Check
 resource "google_compute_http_health_check" "default" {
-  for_each           = { for i, v in local.healthchecks : v.index_key => v if v.is_legacy && v.is_http }
+  for_each           = { for i, v in local.healthchecks : v.index_key => v if local.is_legacy && local.is_http }
   project            = each.value.project_id
   name               = each.value.name
   description        = each.value.description
@@ -192,11 +164,11 @@ resource "google_compute_http_health_check" "default" {
 
 # Legacy HTTPS Health Check
 resource "google_compute_https_health_check" "default" {
-  for_each           = { for i, v in local.healthchecks : v.index_key => v if v.is_legacy && v.is_https }
+  for_each           = { for i, v in local.healthchecks : v.index_key => v if local.is_legacy && local.is_https }
   project            = each.value.project_id
   name               = each.value.name
   description        = each.value.description
   port               = each.value.port
   check_interval_sec = each.value.check_interval_sec
-  timeout_sec        = each.value.timeout
+  timeout_sec        = each.value.timeout_sec
 }

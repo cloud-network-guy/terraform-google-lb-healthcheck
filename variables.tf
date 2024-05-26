@@ -3,15 +3,9 @@ variable "create" {
   default = null
 }
 variable "project_id" {
-  description = "GCP Project ID to create resources in"
-  type        = string
+  type = string
 }
 variable "region" {
-  description = "GCP region name for the IP address and forwarding rule"
-  type        = string
-  default     = null
-}
-variable "name_prefix" {
   type    = string
   default = null
 }
@@ -21,14 +15,6 @@ variable "name" {
 }
 variable "description" {
   type    = string
-  default = null
-}
-variable "global" {
-  type    = bool
-  default = null
-}
-variable "regional" {
-  type    = bool
   default = null
 }
 variable "protocol" {
@@ -41,10 +27,6 @@ variable "host" {
 }
 variable "port" {
   type    = number
-  default = null
-}
-variable "ports" {
-  type    = list(number)
   default = null
 }
 variable "request_path" {
